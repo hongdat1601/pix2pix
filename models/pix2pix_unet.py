@@ -188,7 +188,7 @@ class Pix2Pix():
 
     def save_structure_model(self, batch_size, resize):
         # generator
-        input = torch.randn(batch_size, 3, resize, resize).to(self.device)
+        input = torch.randn(batch_size, 3, resize, resize, device=self.device)
         model_graph = draw_graph(self.generator, input_data=input)
         dot = model_graph.visual_graph
         dot.format = 'png'
@@ -196,7 +196,7 @@ class Pix2Pix():
         dot.render(directory="./model_structure").replace('\\', '/')
 
         # discriminator
-        input = torch.randn(batch_size, 6, resize, resize).to(self.device)
+        input = torch.randn(batch_size, 6, resize, resize, device=self.device)
         model_graph = draw_graph(self.discriminator, input_data=input)
         dot = model_graph.visual_graph
         dot.format = 'png'

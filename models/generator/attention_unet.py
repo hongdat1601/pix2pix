@@ -39,7 +39,7 @@ class AttentionBlock(nn.Module):
 
 class UnetSkipConnectionBlock(nn.Module):
     def __init__(self, outer_nc, inner_nc, input_nc=None,
-                 submodule=None, outermost=False, innermost=False, norm_layer=nn.BatchNorm2d, use_dropout=False):
+                 submodule=None, outermost=False, innermost=False, norm_layer=nn.BatchNorm2d, use_dropout=False, device="cpu"):
         super(UnetSkipConnectionBlock, self).__init__()
         self.outermost = outermost
         if input_nc is None:
@@ -77,38 +77,40 @@ class UnetSkipConnectionBlock(nn.Module):
             else:
                 model = down + [submodule] + up
  
-        self.model = nn.Sequential(*model)
+        self.outer_nc = outer_nc
+        self.device = device
+        self.model = nn.Sequential(*model).to(self.device)
  
     def forward(self, x):
         if self.outermost:
             return self.model(x)
         else:   # add skip connections
-            attention = AttentionBlock(self.outer_nc, self.outer_nc, self.outer_nc)
+            attention = AttentionBlock(self.outer_nc, self.outer_nc, self.outer_nc).to(self.device)
             tmp = attention(self.model(x), x)
             return torch.cat([tmp, self.model(x)], 1)
 
 class AttentionUnetGenerator(nn.Module):
     """Create a Unet-based generator"""
  
-    def __init__(self, input_nc, output_nc, nf=64, norm_layer=nn.BatchNorm2d, use_dropout=False):
+    def __init__(self, input_nc, output_nc, nf=64, norm_layer=nn.BatchNorm2d, use_dropout=False, device="cpu"):
         super(AttentionUnetGenerator, self).__init__()
         # construct unet structure
         # add the innermost block
-        unet_block = UnetSkipConnectionBlock(nf * 8, nf * 8, input_nc=None, submodule=None, norm_layer=norm_layer, innermost=True) 
+        unet_block = UnetSkipConnectionBlock(nf * 8, nf * 8, input_nc=None, submodule=None, norm_layer=norm_layer, innermost=True, device=device) 
         #print(unet_block)
  
         # add intermediate block with nf * 8 filters
-        unet_block = UnetSkipConnectionBlock(nf * 8, nf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout)
-        unet_block = UnetSkipConnectionBlock(nf * 8, nf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout)
-        unet_block = UnetSkipConnectionBlock(nf * 8, nf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout)
+        unet_block = UnetSkipConnectionBlock(nf * 8, nf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout, device=device)
+        unet_block = UnetSkipConnectionBlock(nf * 8, nf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout, device=device)
+        unet_block = UnetSkipConnectionBlock(nf * 8, nf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout, device=device)
  
         # gradually reduce the number of filters from nf * 8 to nf. 
-        unet_block = UnetSkipConnectionBlock(nf * 4, nf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
-        unet_block = UnetSkipConnectionBlock(nf * 2, nf * 4, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
-        unet_block = UnetSkipConnectionBlock(nf, nf * 2, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
+        unet_block = UnetSkipConnectionBlock(nf * 4, nf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, device=device)
+        unet_block = UnetSkipConnectionBlock(nf * 2, nf * 4, input_nc=None, submodule=unet_block, norm_layer=norm_layer, device=device)
+        unet_block = UnetSkipConnectionBlock(nf, nf * 2, input_nc=None, submodule=unet_block, norm_layer=norm_layer, device=device)
          
         # add the outermost block
-        self.model = UnetSkipConnectionBlock(output_nc, nf, input_nc=input_nc, submodule=unet_block, outermost=True, norm_layer=norm_layer)  
+        self.model = UnetSkipConnectionBlock(output_nc, nf, input_nc=input_nc, submodule=unet_block, outermost=True, norm_layer=norm_layer, device=device)  
  
     def forward(self, input):
         """Standard forward"""

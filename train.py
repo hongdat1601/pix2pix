@@ -1,4 +1,5 @@
 import argparse
+import torch
 import torch.nn as nn
 import torchvision.transforms as T
 from utils.data import load_data
@@ -18,7 +19,7 @@ if __name__ == "__main__":
     parser.add_argument("--ext-img", required=False, help="Image file extension.", default="jpg")
     parser.add_argument("--ext-mask", required=False, help="Mask file extension.", default="jpg")
     parser.add_argument("--batch-size", required=False, default=4)
-    parser.add_argument("--resize", required=False, help="Image's size to resize.", default=256)
+    parser.add_argument("--resize", required=False, help="Image's size to resize.", default=256, type=int)
     parser.add_argument("--test-split", required=False, default=0.2)
     parser.add_argument("--verbose", required=False, default=5)
     parser.add_argument("--draw-model", required=False, default=False, type=bool)
@@ -45,7 +46,8 @@ if __name__ == "__main__":
     # Create Model
     generator = UnetGenerator(3, 3, 64, use_dropout=False)
     if args.generator == "attention-unet":
-        generator = AttentionUnetGenerator(3, 3, 64, use_dropout=False)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        generator = AttentionUnetGenerator(3, 3, 64, use_dropout=False, device=device)
 
 
     model = Pix2Pix(generator=generator,
