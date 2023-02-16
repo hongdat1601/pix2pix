@@ -5,7 +5,7 @@ import torchvision.transforms as T
 from utils.data import load_data
 from models.pix2pix_unet import Pix2Pix
 from models.generator.unet import UnetGenerator
-from models.generator.attention_unet import AttentionUnetGenerator
+from models.generator.attention_unet import AttentionUnet
 from models.discriminator.patch_gan import PatchGan
 
 if __name__ == "__main__":
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     generator = UnetGenerator(3, 3, 64, use_dropout=False)
     if args.generator == "attention-unet":
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        generator = AttentionUnetGenerator(3, 3, 64, use_dropout=False, device=device)
+        generator = AttentionUnet(3, 3)
 
 
     model = Pix2Pix(generator=generator,

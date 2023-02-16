@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
-from torchvision.io import read_image
+from torchvision.io import read_image, ImageReadMode
 
 class BaseDataset(Dataset):
   def __init__(self, 
@@ -24,8 +24,10 @@ class BaseDataset(Dataset):
     return len(self.img_names)
 
   def __getitem__(self, idx):
-    img = read_image(os.path.join(self.img_dir, self.img_names[idx] + f'.{self.ext_img}'))
-    mask = read_image(os.path.join(self.mask_dir, self.img_names[idx] + f'.{self.ext_mask}'))
+    img = read_image(os.path.join(self.img_dir, self.img_names[idx] + f'.{self.ext_img}'), 
+                     ImageReadMode.RGB)
+    mask = read_image(os.path.join(self.mask_dir, self.img_names[idx] + f'.{self.ext_mask}'), 
+                     ImageReadMode.RGB)
     
     if self.transform:
       mask = self.transform(mask)
@@ -44,7 +46,7 @@ def load_data(img_dir,
               batch_size=4, 
               test_split=0.2):
     # Load train data
-    imgs = os.listdir(img_dir)
+    imgs = os.listdir(mask_dir)
     imgs = [i.split('.')[0] for i in imgs]
     np.random.seed(42)
     np.random.shuffle(imgs)

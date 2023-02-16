@@ -1,28 +1,68 @@
 import torch
 import torch.nn as nn
 
+class ConvBlock(nn.Module):
+    def __init__(self, ch_in, ch_out, is_first=False):
+      super(ConvBlock, self).__init__()
+
+      conv = nn.Conv2d(ch_in, ch_out,
+                            kernel_size=3, stride=1,
+                            padding=1, bias=False)
+      batch_norm = nn.BatchNorm2d(ch_out)
+      relu = nn.LeakyReLU(0.2, True)
+
+      if is_first:
+        self.model = nn.Sequential(conv, relu)
+      else:
+        self.model = nn.Sequential(conv, batch_norm, relu)
+
+          
+    def forward(self, x):
+        x = self.model(x)
+        return x
+    
+
+
+class UpConvBlock(nn.Module):
+    def __init__(self, ch_in, ch_out):
+      super(UpConvBlock, self).__init__()
+
+      self.up = nn.Sequential(
+                              nn.Upsample(scale_factor=2),
+                              nn.Conv2d(ch_in, ch_out,
+                                        kernel_size=3,stride=1,
+                                        padding=1, bias=False),
+                              nn.BatchNorm2d(ch_out),
+                              nn.ReLU(inplace=True),
+      )
+        
+    def forward(self, x):
+        x = x = self.up(x)
+        return x
+    
+
 class AttentionBlock(nn.Module):
     def __init__(self, f_g, f_l, f_int):
-        super().__init__()
-        
+        super(AttentionBlock, self).__init__()
+
         self.w_g = nn.Sequential(
                                 nn.Conv2d(f_g, f_int,
                                          kernel_size=1, stride=1,
-                                         padding=0, bias=True),
+                                         padding=0, bias=False),
                                 nn.BatchNorm2d(f_int)
         )
         
         self.w_x = nn.Sequential(
                                 nn.Conv2d(f_l, f_int,
                                          kernel_size=1, stride=1,
-                                         padding=0, bias=True),
+                                         padding=0, bias=False),
                                 nn.BatchNorm2d(f_int)
         )
         
         self.psi = nn.Sequential(
                                 nn.Conv2d(f_int, 1,
                                          kernel_size=1, stride=1,
-                                         padding=0,  bias=True),
+                                         padding=0,  bias=False),
                                 nn.BatchNorm2d(1),
                                 nn.Sigmoid(),
         )
@@ -36,82 +76,79 @@ class AttentionBlock(nn.Module):
         psi = self.psi(psi)
         
         return psi*x
+    
 
-class UnetSkipConnectionBlock(nn.Module):
-    def __init__(self, outer_nc, inner_nc, input_nc=None,
-                 submodule=None, outermost=False, innermost=False, norm_layer=nn.BatchNorm2d, use_dropout=False, device="cpu"):
-        super(UnetSkipConnectionBlock, self).__init__()
-        self.outermost = outermost
-        if input_nc is None:
-            input_nc = outer_nc
-        downconv = nn.Conv2d(input_nc, inner_nc, kernel_size=4,
-                             stride=2, padding=1, bias=False)
-        downrelu = nn.LeakyReLU(0.2, True)
-        downnorm = norm_layer(inner_nc)
-        uprelu = nn.ReLU(True)
-        upnorm = norm_layer(outer_nc)
- 
-        if outermost:
-            upconv = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
-                                        kernel_size=4, stride=2,
-                                        padding=1)
-            down = [downconv]
-            up = [uprelu, upconv, nn.Tanh()]
-            model = down + [submodule] + up
-        elif innermost:
-            upconv = nn.ConvTranspose2d(inner_nc, outer_nc,
-                                        kernel_size=4, stride=2,
-                                        padding=1, bias=False)
-            down = [downrelu, downconv]
-            up = [uprelu, upconv, upnorm]
-            model = down + up
-        else:
-            upconv = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
-                                        kernel_size=4, stride=2,
-                                        padding=1, bias=False)
-            down = [downrelu, downconv, downnorm]
-            up = [uprelu, upconv, upnorm]
- 
-            if use_dropout:
-                model = down + [submodule] + up + [nn.Dropout(0.5)]
-            else:
-                model = down + [submodule] + up
- 
-        self.outer_nc = outer_nc
-        self.device = device
-        self.model = nn.Sequential(*model).to(self.device)
- 
+class AttentionUnet(nn.Module):
+    def __init__(self, in_channel=3, out_channel=3):
+      super(AttentionUnet, self).__init__()
+
+      self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
+      
+      self.conv1 = ConvBlock(ch_in=in_channel, ch_out=64, is_first=True)
+      self.conv2 = ConvBlock(ch_in=64, ch_out=128)
+      self.conv3 = ConvBlock(ch_in=128, ch_out=256)
+      self.conv4 = ConvBlock(ch_in=256, ch_out=512)
+      self.conv5 = ConvBlock(ch_in=512, ch_out=512)
+      
+      self.up5 = UpConvBlock(ch_in=512, ch_out=512)
+      self.att5 = AttentionBlock(f_g=512, f_l=512, f_int=256)
+      self.upconv5 = ConvBlock(ch_in=1024, ch_out=512)
+      
+      self.up4 = UpConvBlock(ch_in=512, ch_out=256)
+      self.att4 = AttentionBlock(f_g=256, f_l=256, f_int=128)
+      self.upconv4 = ConvBlock(ch_in=512, ch_out=256)
+      
+      self.up3 = UpConvBlock(ch_in=256, ch_out=128)
+      self.att3 = AttentionBlock(f_g=128, f_l=128, f_int=64)
+      self.upconv3 = ConvBlock(ch_in=256, ch_out=128)
+      
+      self.up2 = UpConvBlock(ch_in=128, ch_out=64)
+      self.att2 = AttentionBlock(f_g=64, f_l=64, f_int=32)
+      self.upconv2 = ConvBlock(ch_in=128, ch_out=64)
+      
+      self.conv_1x1 = nn.Conv2d(64, out_channel,
+                                kernel_size=1, stride=1, padding=0)
+        
     def forward(self, x):
-        if self.outermost:
-            return self.model(x)
-        else:   # add skip connections
-            attention = AttentionBlock(self.outer_nc, self.outer_nc, self.outer_nc).to(self.device)
-            tmp = attention(self.model(x), x)
-            return torch.cat([tmp, self.model(x)], 1)
+        # encoder
+        x1 = self.conv1(x)
+        
+        x2 = self.maxpool(x1)
+        x2 = self.conv2(x2)
+        
+        x3 = self.maxpool(x2)
+        x3 = self.conv3(x3)
+        
+        x4 = self.maxpool(x3)
+        x4 = self.conv4(x4)
+        
+        x5 = self.maxpool(x4)
+        x5 = self.conv5(x5)
 
-class AttentionUnetGenerator(nn.Module):
-    """Create a Unet-based generator"""
- 
-    def __init__(self, input_nc, output_nc, nf=64, norm_layer=nn.BatchNorm2d, use_dropout=False, device="cpu"):
-        super(AttentionUnetGenerator, self).__init__()
-        # construct unet structure
-        # add the innermost block
-        unet_block = UnetSkipConnectionBlock(nf * 8, nf * 8, input_nc=None, submodule=None, norm_layer=norm_layer, innermost=True, device=device) 
-        #print(unet_block)
- 
-        # add intermediate block with nf * 8 filters
-        unet_block = UnetSkipConnectionBlock(nf * 8, nf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout, device=device)
-        unet_block = UnetSkipConnectionBlock(nf * 8, nf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout, device=device)
-        unet_block = UnetSkipConnectionBlock(nf * 8, nf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout, device=device)
- 
-        # gradually reduce the number of filters from nf * 8 to nf. 
-        unet_block = UnetSkipConnectionBlock(nf * 4, nf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, device=device)
-        unet_block = UnetSkipConnectionBlock(nf * 2, nf * 4, input_nc=None, submodule=unet_block, norm_layer=norm_layer, device=device)
-        unet_block = UnetSkipConnectionBlock(nf, nf * 2, input_nc=None, submodule=unet_block, norm_layer=norm_layer, device=device)
-         
-        # add the outermost block
-        self.model = UnetSkipConnectionBlock(output_nc, nf, input_nc=input_nc, submodule=unet_block, outermost=True, norm_layer=norm_layer, device=device)  
- 
-    def forward(self, input):
-        """Standard forward"""
-        return self.model(input)
+        
+        # decoder + concat
+        d5 = self.up5(x5)
+        x4 = self.att5(g=d5, x=x4)
+        d5 = torch.concat((x4, d5), dim=1)
+        d5 = self.upconv5(d5)
+
+        
+        d4 = self.up4(d5)
+        x3 = self.att4(g=d4, x=x3)
+        d4 = torch.concat((x3, d4), dim=1)
+        d4 = self.upconv4(d4)
+        
+        d3 = self.up3(d4)
+        x2 = self.att3(g=d3, x=x2)
+        d3 = torch.concat((x2, d3), dim=1)
+        d3 = self.upconv3(d3)
+        
+        d2 = self.up2(d3)
+        x1 = self.att2(g=d2, x=x1)
+        d2 = torch.concat((x1, d2), dim=1)
+        d2 = self.upconv2(d2)
+        
+        d1 = self.conv_1x1(d2)
+        d1 = nn.Tanh()(d1)
+        
+        return d1
