@@ -24,7 +24,6 @@ if __name__ == "__main__":
     parser.add_argument("--draw-model", required=False, default=False, type=bool)
 
     args = parser.parse_args()
-    print(args.img_dir)
 
     # Load data
     transform = T.Compose([

@@ -140,7 +140,7 @@ class Pix2Pix():
     def load_history(self):
         if os.path.exists("./cache/history.pickle"):
             with open("./cache/history.pickle", 'rb') as file:
-                pickle.dump(self.history, file)
+                self.history = pickle.load(file)
 
         print("==> History loaded.")
 
