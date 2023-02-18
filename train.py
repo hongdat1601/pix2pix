@@ -21,7 +21,6 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", required=False, default=4)
     parser.add_argument("--resize", required=False, help="Image's size to resize.", default=256, type=int)
     parser.add_argument("--test-split", required=False, default=0.2)
-    parser.add_argument("--verbose", required=False, default=5)
     parser.add_argument("--draw-model", required=False, default=False, type=bool)
 
     args = parser.parse_args()
@@ -61,5 +60,4 @@ if __name__ == "__main__":
 
     # Train Model
     model.train_pix2pix(train_dataloader=train_dataloader, 
-                        epochs=args.epochs, 
-                        verbose=args.verbose)
+                        epochs=args.epochs)

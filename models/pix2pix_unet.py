@@ -2,11 +2,11 @@ import os
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
-import graphviz
 from torchview import draw_graph
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+from tqdm import tqdm
 
 
 class Pix2Pix():
@@ -21,7 +21,6 @@ class Pix2Pix():
         self.history = {
             "G_loss": [],
             "D_loss": [],
-            "epochs": 0
         }
 
         self.load_model_weights()
@@ -145,7 +144,7 @@ class Pix2Pix():
 
         print("==> History loaded.")
 
-    def train_pix2pix(self, train_dataloader, epochs, verbose=5):
+    def train_pix2pix(self, train_dataloader, epochs):
         self.generator.train()
         self.discriminator.train()
 
@@ -155,13 +154,11 @@ class Pix2Pix():
 
             G_loss_tmp = []
             D_loss_tmp = []
-
+            print(f'Epoch {epoch}')
+            
             # Train data
-            for iter, (input_img, target_img) in enumerate(train_dataloader):
+            for (input_img, target_img) in tqdm(train_dataloader):
                 loss = self.train_step(input_img=input_img, target_img=target_img)
-
-                if iter % verbose == 0:
-                    print("Epochs: %d/%d\tIter: %d/%d" % (epoch, epochs, iter, len(train_dataloader)))
 
                 G_loss_tmp.append(loss['G_loss'])
                 D_loss_tmp.append(loss['D_loss'])
@@ -180,10 +177,8 @@ class Pix2Pix():
             if (min_g_loss is None) or min_g_loss > self.history["G_loss"][-1] :
                 min_g_loss = self.history["G_loss"][-1]
                 self.save_model()
-
-        
+   
             # Save history
-            self.history["epochs"] = epoch
             self.save_history()
 
     def save_structure_model(self, batch_size, resize):
