@@ -68,7 +68,7 @@ def load_data(img_dir,
               target_transform=None, 
               batch_size=4):
     # Load train data
-    train_dataloader = get_data('./train.txt', 
+    train_dataloader = get_data('./data/train.txt', 
                              img_dir, 
                              mask_dir, 
                              ext_img, 
@@ -78,7 +78,7 @@ def load_data(img_dir,
                              batch_size)
 
     # Load val data
-    test_dataloader = get_data('./test.txt',
+    test_dataloader = get_data('./data/test.txt',
                                 img_dir,
                                 mask_dir,
                                 ext_img,
