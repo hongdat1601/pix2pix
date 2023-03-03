@@ -31,7 +31,7 @@ if __name__ == "__main__":
     ])
 
 
-    train_dataloader, val_dataloader = load_data(img_dir=args.img_dir,
+    train_dataloader, test_dataloader = load_data(img_dir=args.img_dir,
                                                  mask_dir=args.mask_dir,
                                                  ext_img=args.ext_img,
                                                  ext_mask=args.ext_mask,
@@ -57,4 +57,5 @@ if __name__ == "__main__":
 
     # Train Model
     model.train_pix2pix(train_dataloader=train_dataloader, 
-                        epochs=args.epochs, imgs_dir=args.img_dir, batch_size=args.batch_size)
+                        epochs=args.epochs, imgs_dir=args.img_dir, 
+                        batch_size=args.batch_size, test_dataloader=test_dataloader)

@@ -93,20 +93,15 @@ class Pix2Pix():
         G_loss.backward()
         self.G_optimizer.step()
 
-        # Calculate FID Score
-        gen_imgs = self.generator(input_img)
-        fid_score = calculate_fid(imgs_dir, gen_imgs, batch_size)
-
         return {
             "G_loss": G_loss.item(),
             "D_loss": D_total_loss.item(),
-            "FID": fid_score
         }
 
     def print_result(self, epoch, num_epochs):
         print('[%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tFID: %.4f'
               % (epoch, num_epochs,
-                 self.history["D_loss"][-1], self.history["G_loss"][-1]), self.history["FID"])
+                 self.history["D_loss"][-1], self.history["G_loss"][-1], self.history["FID"][-1]))
 
     def save_model(self):
         if os.path.exists("./weights/generator_weights.pth"):
@@ -141,7 +136,7 @@ class Pix2Pix():
         fig.savefig('./history.png')
 
         fig, ax = plt.subplots()
-        ax.plot(self.history["FID"], label="G_loss")
+        ax.plot(self.history["FID"], label="FID")
         ax.legend()
         fig.savefig('./FID_score.png')
 
@@ -156,7 +151,7 @@ class Pix2Pix():
 
         print("==> History loaded.")
 
-    def train_pix2pix(self, train_dataloader, epochs, imgs_dir, batch_size):
+    def train_pix2pix(self, train_dataloader, test_dataloader, epochs, imgs_dir, batch_size):
         self.generator.train()
         self.discriminator.train()
 
@@ -165,17 +160,27 @@ class Pix2Pix():
         for epoch in range(1, epochs+1):
 
             print(f'Epoch {epoch}')
-            fid_scores = []
 
             # Train data
+            print('Train')
             for (input_img, target_img) in tqdm(train_dataloader):
                 res = self.train_step(input_img=input_img, target_img=target_img, imgs_dir=imgs_dir, batch_size=batch_size)
 
                 self.history["G_loss"].append(res['G_loss'])
                 self.history["D_loss"].append(res['D_loss'])
-                fid_scores.append(res["FID"])
+   
+            # Calculate FID
+            print("Calulate FID")
+            gen_imgs = []
             
-            self.history["FID"].append(np.mean(fid_scores))
+            for (input_img, target_img) in tqdm(test_dataloader):
+                gen_img = self.generator(input_img.to(self.device)).cpu().detach()
+                gen_imgs.append(gen_img)
+
+            gen_imgs = torch.stack(gen_imgs)
+            fid_score = calculate_fid(imgs_dir, gen_imgs, batch_size, self.device)
+
+            self.history["FID"].append(fid_score)
 
             # Print result
             self.print_result(epoch, epochs)

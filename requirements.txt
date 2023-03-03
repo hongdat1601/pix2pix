@@ -5,3 +5,4 @@ torchvision
 graphviz
 torchview
 Pillow
+tqdm

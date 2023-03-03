@@ -10,20 +10,7 @@ import glob
 import os
 from scipy import linalg
 import warnings
-
-
-def to_cuda(elements):
-    """
-    Transfers elements to cuda if GPU is available
-    Args:
-        elements: torch.tensor or torch.nn.module
-        --
-    Returns:
-        elements: same as input on GPU memory, if available
-    """
-    if torch.cuda.is_available():
-        return elements.cuda()
-    return elements
+from tqdm import tqdm
 
 
 class PartialInceptionNetwork(nn.Module):
@@ -59,7 +46,7 @@ class PartialInceptionNetwork(nn.Module):
         return activations
 
 
-def get_activations(images, batch_size):
+def get_activations(images, batch_size, device):
     """
     Calculates activations for last pool layer for all iamges
     --
@@ -73,16 +60,16 @@ def get_activations(images, batch_size):
 
     num_images = images.shape[0]
     inception_network = PartialInceptionNetwork()
-    inception_network = to_cuda(inception_network)
+    inception_network = inception_network.to(device)
     inception_network.eval()
     n_batches = int(np.ceil(num_images  / batch_size))
     inception_activations = np.zeros((num_images, 2048), dtype=np.float32)
-    for batch_idx in range(n_batches):
+    for batch_idx in tqdm(range(n_batches)):
         start_idx = batch_size * batch_idx
         end_idx = batch_size * (batch_idx + 1)
 
         ims = images[start_idx:end_idx]
-        ims = to_cuda(ims)
+        ims = ims.to(device)
         activations = inception_network(ims)
         activations = activations.detach().cpu().numpy()
         assert activations.shape == (ims.shape[0], 2048), "Expexted output shape to be: {}, but was: {}".format((ims.shape[0], 2048), activations.shape)
@@ -91,7 +78,7 @@ def get_activations(images, batch_size):
 
 
 
-def calculate_activation_statistics(images, batch_size):
+def calculate_activation_statistics(images, batch_size, device):
     """Calculates the statistics used by FID
     Args:
         images: torch.tensor, shape: (N, 3, H, W), dtype: torch.float32 in range 0 - 1
@@ -102,7 +89,7 @@ def calculate_activation_statistics(images, batch_size):
                 of the inception model.
     """
     images = preprocess_images(images)
-    act = get_activations(images, batch_size)
+    act = get_activations(images, batch_size, device)
     mu = np.mean(act, axis=0)
     sigma = np.cov(act, rowvar=False)
     return mu, sigma
@@ -187,6 +174,7 @@ def load_images(images_path):
     for i in lst_imgs:
         im = PIL.Image.open(os.path.join(images_path, i))
         im = im.convert('RGB')
+        im = im.resize((256, 256))
         imgs.append(trans(im))
 
     imgs = torch.stack(imgs)
@@ -208,7 +196,7 @@ def load_cache():
         cache = pickle.load(f)
     return cache
 
-def calculate_fid(original_imgs_path, gen_imgs, batch_size):
+def calculate_fid(original_imgs_path, gen_imgs, batch_size, device):
     """ Calculate FID between images1 and images2
     Args:
         original_imgs_path: str, Images folder path
@@ -220,13 +208,14 @@ def calculate_fid(original_imgs_path, gen_imgs, batch_size):
     """
     if not os.path.exists('./cache/fid_cache.pickle'):
         original_imgs = load_images(original_imgs_path)
-        mu1, sigma1 = calculate_activation_statistics(original_imgs, batch_size)
+        print("Create FID Cache")
+        mu1, sigma1 = calculate_activation_statistics(original_imgs, batch_size, device)
         save_cahe(mu1, sigma1)
     else:
         cache = load_cache()
         mu1 = cache["mu"]
         sigma1 = cache["sigma"]
     
-    mu2, sigma2 = calculate_activation_statistics(gen_imgs, batch_size)
+    mu2, sigma2 = calculate_activation_statistics(gen_imgs, batch_size, device)
     fid = calculate_frechet_distance(mu1, sigma1, mu2, sigma2)
     return fid
