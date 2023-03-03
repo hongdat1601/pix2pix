@@ -177,7 +177,7 @@ class Pix2Pix():
                 gen_img = self.generator(input_img.to(self.device)).cpu().detach()
                 gen_imgs.append(gen_img)
 
-            gen_imgs = torch.stack(gen_imgs)
+            gen_imgs = torch.cat(gen_imgs, dim=0)
             fid_score = calculate_fid(imgs_dir, gen_imgs, batch_size, self.device)
 
             self.history["FID"].append(fid_score)

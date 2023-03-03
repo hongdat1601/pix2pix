@@ -4,9 +4,7 @@ from torchvision.models import inception_v3
 import torchvision.transforms  as T
 import PIL
 import pickle
-import multiprocessing
 import numpy as np
-import glob
 import os
 from scipy import linalg
 import warnings
@@ -17,7 +15,7 @@ class PartialInceptionNetwork(nn.Module):
 
     def __init__(self, transform_input=True):
         super().__init__()
-        self.inception_network = inception_v3(pretrained=True)
+        self.inception_network = inception_v3(weights='DEFAULT')
         self.inception_network.Mixed_7c.register_forward_hook(self.output_hook)
         self.transform_input = transform_input
 
