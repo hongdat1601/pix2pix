@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from tqdm import tqdm
+from metrics.fid_score import calculate_fid
 
 
 class Pix2Pix():
@@ -21,6 +22,7 @@ class Pix2Pix():
         self.history = {
             "G_loss": [],
             "D_loss": [],
+            "FID": []
         }
 
         self.load_model_weights()
@@ -48,7 +50,7 @@ class Pix2Pix():
         disc_loss = self.dis_loss(output, label)
         return disc_loss
     
-    def train_step(self, input_img, target_img):
+    def train_step(self, input_img, target_img, imgs_dir, batch_size):
         self.D_optimizer.zero_grad()
         input_img = input_img.to(self.device)
         target_img = target_img.to(self.device)
@@ -91,15 +93,20 @@ class Pix2Pix():
         G_loss.backward()
         self.G_optimizer.step()
 
+        # Calculate FID Score
+        gen_imgs = self.generator(input_img)
+        fid_score = calculate_fid(imgs_dir, gen_imgs, batch_size)
+
         return {
             "G_loss": G_loss.item(),
-            "D_loss": D_total_loss.item()
+            "D_loss": D_total_loss.item(),
+            "FID": fid_score
         }
 
-    def print_result(self, epoch, num_epochs, D_loss, G_loss):
-        print('[%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f'
+    def print_result(self, epoch, num_epochs):
+        print('[%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tFID: %.4f'
               % (epoch, num_epochs,
-                 D_loss, G_loss))
+                 self.history["D_loss"][-1], self.history["G_loss"][-1]), self.history["FID"])
 
     def save_model(self):
         if os.path.exists("./weights/generator_weights.pth"):
@@ -133,6 +140,11 @@ class Pix2Pix():
         ax.legend()
         fig.savefig('./history.png')
 
+        fig, ax = plt.subplots()
+        ax.plot(self.history["FID"], label="G_loss")
+        ax.legend()
+        fig.savefig('./FID_score.png')
+
         with open("./cache/history.pickle", 'wb') as file:
             pickle.dump(self.history, file)
         print("==> History saved.")
@@ -144,38 +156,33 @@ class Pix2Pix():
 
         print("==> History loaded.")
 
-    def train_pix2pix(self, train_dataloader, epochs):
+    def train_pix2pix(self, train_dataloader, epochs, imgs_dir, batch_size):
         self.generator.train()
         self.discriminator.train()
 
-        min_g_loss = None
+        min_FID = None
 
         for epoch in range(1, epochs+1):
 
-            G_loss_tmp = []
-            D_loss_tmp = []
             print(f'Epoch {epoch}')
-            
+            fid_scores = []
+
             # Train data
             for (input_img, target_img) in tqdm(train_dataloader):
-                loss = self.train_step(input_img=input_img, target_img=target_img)
+                res = self.train_step(input_img=input_img, target_img=target_img, imgs_dir=imgs_dir, batch_size=batch_size)
 
-                G_loss_tmp.append(loss['G_loss'])
-                D_loss_tmp.append(loss['D_loss'])
+                self.history["G_loss"].append(res['G_loss'])
+                self.history["D_loss"].append(res['D_loss'])
+                fid_scores.append(res["FID"])
             
-            if len(self.history["G_loss"]) > 0:
-                min_g_loss = np.min(self.history["G_loss"])
-
-            self.history["G_loss"].append(np.mean(G_loss_tmp))
-            self.history["D_loss"].append(np.mean(D_loss_tmp))
+            self.history["FID"].append(np.mean(fid_scores))
 
             # Print result
-            self.print_result(epoch, epochs, 
-                              self.history["D_loss"][-1], self.history["G_loss"][-1])
+            self.print_result(epoch, epochs)
             
             # Save model
-            if (min_g_loss is None) or min_g_loss > self.history["G_loss"][-1] :
-                min_g_loss = self.history["G_loss"][-1]
+            if (min_FID is None) or min_FID > self.history["FID"][-1] :
+                min_FID = self.history["FID"][-1]
                 self.save_model()
    
             # Save history

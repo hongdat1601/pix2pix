@@ -37,47 +37,54 @@ class BaseDataset(Dataset):
 
     return mask, img
   
+def get_data(file_path, img_dir, mask_dir, ext_img, ext_mask, transform, target_transform, batch_size):
+    with open(file_path, 'r') as f:
+        imgs = f.read()
+    imgs = imgs.split('\n')
+
+    try:
+        imgs.remove('')
+    except:
+        pass
+
+    dataset = BaseDataset(
+        img_names=imgs,
+        img_dir=img_dir,
+        mask_dir=mask_dir,
+        ext_img=ext_img,
+        ext_mask=ext_mask,
+        transform=transform,
+        target_transform=target_transform
+    )
+
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    return dataloader
+  
 def load_data(img_dir, 
               mask_dir, 
               ext_img="jpg", 
               ext_mask="jpg", 
               transform=None, 
               target_transform=None, 
-              batch_size=4, 
-              test_split=0.2):
+              batch_size=4):
     # Load train data
-    imgs = os.listdir(mask_dir)
-    imgs = [i.split('.')[0] for i in imgs]
-    np.random.seed(42)
-    np.random.shuffle(imgs)
-
-    train_max_idx = int(len(imgs) * (1 - test_split))
-    train_imgs = imgs[:train_max_idx]
-    val_imgs = imgs[train_max_idx:]
-
-    train_dataset = BaseDataset(
-       img_names=train_imgs,
-       img_dir=img_dir,
-       mask_dir=mask_dir,
-       ext_img=ext_img,
-       ext_mask=ext_mask,
-       transform=transform,
-       target_transform=target_transform
-    )
+    train_dataloader = get_data('./train.txt', 
+                             img_dir, 
+                             mask_dir, 
+                             ext_img, 
+                             ext_mask, 
+                             transform, 
+                             target_transform,
+                             batch_size)
 
     # Load val data
+    test_dataloader = get_data('./test.txt',
+                                img_dir,
+                                mask_dir,
+                                ext_img,
+                                ext_mask,
+                                transform,
+                                target_transform,
+                                batch_size)
 
-    val_dataset = BaseDataset(
-       img_names=val_imgs,
-       img_dir=img_dir,
-       mask_dir=mask_dir,
-       ext_img=ext_img,
-       ext_mask=ext_mask,
-       transform=transform,
-       target_transform=target_transform
-    )
-
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
-
-    return (train_dataloader, val_dataloader)
+    return (train_dataloader, test_dataloader)
