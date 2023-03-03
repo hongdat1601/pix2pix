@@ -18,7 +18,7 @@ if __name__ == "__main__":
     parser.add_argument("--generator", required=False, choices=['unet', 'attention-unet'], help="Select generator model.", default="unet")
     parser.add_argument("--ext-img", required=False, help="Image file extension.", default="jpg")
     parser.add_argument("--ext-mask", required=False, help="Mask file extension.", default="jpg")
-    parser.add_argument("--batch-size", required=False, default=4)
+    parser.add_argument("--batch-size", required=False, default=4, type=int)
     parser.add_argument("--resize", required=False, help="Image's size to resize.", default=256, type=int)
     parser.add_argument("--draw-model", required=False, default=False, type=bool)
 
