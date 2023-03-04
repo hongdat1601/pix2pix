@@ -80,4 +80,4 @@ if __name__ == "__main__":
         ax[2].imshow(grid_pred.permute(1, 2, 0))
         ax[2].set_title('Generated Image')
 
-        fig.savefig('./result/{i}.png')
+        fig.savefig(f'./result/{i}.png')
