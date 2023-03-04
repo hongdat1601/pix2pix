@@ -210,3 +210,14 @@ class Pix2Pix():
         dot.filename = "Discriminator"
         dot.render(directory="./model_structure").replace('\\', '/')
 
+    def generate(self, masks, device=None):
+        self.generator.eval()
+        device = torch.device("cpu") if None else device
+
+        input = masks.to(device)
+        generator = self.generator.to(device)
+
+        pred = generator(input).cpu().detach()
+        return pred
+
+

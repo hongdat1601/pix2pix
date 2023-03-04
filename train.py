@@ -1,5 +1,4 @@
 import argparse
-import torch
 import torch.nn as nn
 import torchvision.transforms as T
 from utils.data import load_data
@@ -7,6 +6,7 @@ from models.pix2pix_unet import Pix2Pix
 from models.generator.unet import UnetGenerator
 from models.generator.attention_unet import AttentionUnet
 from models.discriminator.patch_gan import PatchGan
+import os
 
 if __name__ == "__main__":
     # Add Arguments
@@ -23,6 +23,19 @@ if __name__ == "__main__":
     parser.add_argument("--draw-model", required=False, default=False, type=bool)
 
     args = parser.parse_args()
+
+    if not os.path.exists('./cache'):
+        os.mkdir('./cache')
+        print("Created cache folder")
+
+    if not os.path.exists('./weights'):
+        os.mkdir('./weights')
+        print("Created weights folder")
+
+    if not os.path.exists('./model_structure'):
+        os.mkdir('./model_structure')
+        print("Created model_structure folder")
+
 
     # Load data
     transform = T.Compose([
@@ -42,7 +55,6 @@ if __name__ == "__main__":
     # Create Model
     generator = UnetGenerator(3, 3, 64, use_dropout=False)
     if args.generator == "attention-unet":
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         generator = AttentionUnet(3, 3)
 
 
